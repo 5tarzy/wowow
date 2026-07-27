@@ -1,15 +1,83 @@
-import { Club, Fixture, Player, SaveState } from "../types";
-import { InjuryEngine } from "./InjuryEngine";
-import { TransferEngine } from "./TransferEngine";
-import { YouthAcademy } from "./YouthAcademy";
-const clamp=(n:number,min=0,max=100)=>Math.max(min,Math.min(max,n));
-export class SimulationEngine {
- static playerRating(p:Player){const a=p.attributes;const base=p.position==="ATT"?a.finishing*.3+a.pace*.15+a.dribbling*.15+a.composure*.15+a.positioning*.15+a.stamina*.1:p.position==="MID"?a.passing*.25+a.vision*.2+a.ballControl*.15+a.stamina*.15+a.positioning*.15+a.dribbling*.1:p.position==="DEF"?a.defending*.3+a.tackling*.2+a.strength*.15+a.positioning*.15+a.pace*.1+a.passing*.1:a.reactions*.3+a.positioning*.25+a.strength*.15+a.composure*.15+a.passing*.15;return Math.round(base*.72+p.form*.16+p.fitness*.12)}
- static calculateTeamStrength(c:Club){return c.players.length?Math.round(c.players.reduce((s,p)=>s+this.playerRating(p),0)/c.players.length):0}
- static simulateFixture(club:Club,fixture:Fixture):Fixture{const s=this.calculateTeamStrength(club)+(fixture.homeClubId===club.id?4:0);const x=Math.max(.2,(s-60)/20+(Math.random()-.5));const ox=Math.max(.2,1.2+(Math.random()-.5));const g=Math.max(0,Math.round(x+(Math.random()-.5)*1.8));const og=Math.max(0,Math.round(ox+(Math.random()-.5)*1.8));return {...fixture,result:`${g}-${og}`,xg:`${x.toFixed(2)} - ${ox.toFixed(2)}`}}
- static advanceDay(state:SaveState):SaveState{const d=new Date(state.currentDate);d.setDate(d.getDate()+1);const club={...state.club,players:state.club.players.map(p=>{let n=InjuryEngine.recover(p);const load=n.injury?2:5;n=InjuryEngine.maybeInjure(n,load);const form=clamp(n.form+(Math.random()-.5)*1.2);const dev=n.age<=21?.05:n.age<=26?.02:n.age>=32?-.03:0;return {...n,form,overall:clamp(n.overall+dev,1,99),potential:clamp(n.potential+dev*.5,1,99)}})};return {...state,currentDate:d.toISOString().slice(0,10),club}}
- static simulateNextMatch(state:SaveState):SaveState{const i=state.fixtures.findIndex(f=>!f.result);if(i<0)return state;const f=this.simulateFixture(state.club,state.fixtures[i]);const [gf,ga]=f.result!.split("-").map(Number);const club={...state.club,players:state.club.players.map(p=>({...p,appearances:p.appearances+1,goals:p.goals+(p.position==="ATT"&&gf>0&&Math.random()<.35?1:0),assists:p.assists+(p.position==="MID"&&gf>0&&Math.random()<.25?1:0),form:clamp(p.form+(gf>ga?1.5:gf<ga?-1:.2)),fitness:clamp(p.fitness-8)}))};return {...state,club,fixtures:state.fixtures.map((x,j)=>j===i?f:x),news:[`${club.name} ${f.result} ${f.away}`,...state.news].slice(0,20)}}
- static simulateWeek(state:SaveState):SaveState{let n=state;for(let i=0;i<7;i++)n=this.advanceDay(n);return n}
- static generateYouth(state:SaveState):SaveState{const youth=YouthAcademy.generate(state.club,Number(state.currentDate.slice(0,4)));return {...state,club:{...state.club,players:[...state.club.players,youth]},news:[`Youth academy promoted ${youth.name}, a ${youth.position} with ${youth.potential} potential.`,...state.news]}}
- static aiTransfers(state:SaveState):SaveState{const offers=TransferEngine.aiTransfer(state.clubs,state.season);return {...state,transferOffers:[...state.transferOffers,...offers],news:[...offers.map(o=>`Transfer negotiation opened for ${o.playerId}.`),...state.news].slice(0,20)}}
-}
+import { Club, MatchResult, MatchStats } from '../types';
+
+const rng = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const rngFloat = (min: number, max: number) => (Math.random() * (max - min) + min);
+
+const calculateTeamStrength = (team: Club) => {
+  const starters = team.players.slice(0, 11);
+  let attack = 0, midfield = 0, defense = 0, gk = 0;
+  let attCount = 0, midCount = 0, defCount = 0;
+
+  starters.forEach(p => {
+    if (p.position === 'ATT' || p.position === 'WINGER') { attack += p.overall; attCount++; }
+    else if (p.position === 'MID') { midfield += p.overall; midCount++; }
+    else if (p.position === 'DEF') { defense += p.overall; defCount++; }
+    else if (p.position === 'GK') { gk = p.overall; }
+  });
+
+  return {
+    attack: attCount > 0 ? attack / attCount : 50,
+    midfield: midCount > 0 ? midfield / midCount : 50,
+    defense: defCount > 0 ? defense / defCount : 50,
+    gk: gk || 50
+  };
+};
+
+const initMatchStats = (): MatchStats => ({
+  goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, xG: 0, xA: 0,
+  possession: 50, passesCompleted: 0, keyPasses: 0, tackles: 0,
+  interceptions: 0, saves: 0, yellowCards: 0, redCards: 0
+});
+
+export const simulateMatch = (homeTeam: Club, awayTeam: Club, competition: string, date: string): MatchResult => {
+  const homeStrength = calculateTeamStrength(homeTeam);
+  const awayStrength = calculateTeamStrength(awayTeam);
+
+  const homeStats = initMatchStats();
+  const awayStats = initMatchStats();
+
+  const totalMid = homeStrength.midfield + awayStrength.midfield;
+  homeStats.possession = Math.round((homeStrength.midfield / totalMid) * 100);
+  awayStats.possession = 100 - homeStats.possession;
+
+  const homeAdvantage = 1.05;
+  const homeChances = (homeStrength.attack * homeAdvantage) / awayStrength.defense;
+  const awayChances = awayStrength.attack / (homeStrength.defense * homeAdvantage);
+
+  homeStats.shots = Math.round(homeChances * rng(8, 15));
+  awayStats.shots = Math.round(awayChances * rng(8, 15));
+
+  homeStats.shotsOnTarget = Math.round(homeStats.shots * rngFloat(0.3, 0.6));
+  awayStats.shotsOnTarget = Math.round(awayStats.shots * rngFloat(0.3, 0.6));
+
+  homeStats.xG = parseFloat((homeStats.shotsOnTarget * rngFloat(0.1, 0.35)).toFixed(2));
+  awayStats.xG = parseFloat((awayStats.shotsOnTarget * rngFloat(0.1, 0.35)).toFixed(2));
+
+  const homeGoalProb = homeStats.xG / (awayStrength.gk / 50); 
+  const awayGoalProb = awayStats.xG / (homeStrength.gk / 50);
+
+  homeStats.goals = Math.round(homeGoalProb * rngFloat(0.7, 1.3));
+  awayStats.goals = Math.round(awayGoalProb * rngFloat(0.7, 1.3));
+
+  homeStats.saves = awayStats.shotsOnTarget - awayStats.goals;
+  awayStats.saves = homeStats.shotsOnTarget - homeStats.goals;
+  
+  homeStats.passesCompleted = Math.round(homeStats.possession * rng(4, 7));
+  awayStats.passesCompleted = Math.round(awayStats.possession * rng(4, 7));
+
+  homeStats.tackles = rng(10, 25);
+  awayStats.tackles = rng(10, 25);
+
+  return {
+    id: `match-${Date.now()}`,
+    date,
+    competition,
+    homeTeamId: homeTeam.id,
+    awayTeamId: awayTeam.id,
+    homeScore: homeStats.goals,
+    awayScore: awayStats.goals,
+    homeStats,
+    awayStats,
+    events: []
+  };
+};
