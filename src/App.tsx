@@ -3,6 +3,7 @@ import { WorldState, Club, MatchResult } from './types';
 import { getInitialWorldState } from './data';
 import { loadWorld, saveWorld } from './storage';
 import { simulateMatch } from './engine/SimulationEngine';
+import { advanceDay } from './engine/GlobalScheduler'; // <-- Imported the new clock!
 
 export default function App() {
   const [world, setWorld] = useState<WorldState | null>(null);
@@ -45,9 +46,20 @@ export default function App() {
 
   return (
     <div style={{ backgroundColor: '#0f172a', color: '#f8fafc', minHeight: '100vh', fontFamily: 'sans-serif', padding: '20px' }}>
-      <header style={{ borderBottom: '1px solid #334155', pb: '15px', mb: '20px' }}>
+      <header style={{ borderBottom: '1px solid #334155', paddingBottom: '15px', marginBottom: '20px' }}>
         <h1 style={{ margin: 0, color: '#38bdf8' }}>Football Management Simulator</h1>
         <p style={{ color: '#94a3b8', margin: '5px 0 0 0' }}>Managing: <strong>{userClub.name}</strong> | Date: {world.currentDate}</p>
+        
+        {/* NEW ADVANCE DAY BUTTON */}
+        <button 
+          onClick={async () => {
+            const newWorld = advanceDay(world);
+            setWorld(newWorld);
+            await saveWorld(newWorld);
+          }}
+          style={{ marginTop: '10px', padding: '8px 15px', backgroundColor: '#475569', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+          Advance 1 Day ⏩
+        </button>
       </header>
 
       {/* Navigation Tabs */}
