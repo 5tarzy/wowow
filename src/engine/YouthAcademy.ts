@@ -2,8 +2,24 @@ import { Club, Player, Position, PlayerAttributes } from '../types';
 
 const rng = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-const firstNames = ['James', 'Liam', 'Noah', 'Lucas', 'Mason', 'Ethan', 'Alexander', 'Benjamin', 'Daniel', 'Mateo', 'Leo', 'Gabriel', 'Julian', 'Carlos', 'Marco', 'Giovanni', 'Lukas', 'Sven', 'Timo', 'Antoine'];
-const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin'];
+const firstNames = [
+  'James', 'Liam', 'Noah', 'Lucas', 'Mason', 'Ethan', 'Alexander', 'Benjamin', 'Daniel', 'Mateo', 
+  'Leo', 'Gabriel', 'Julian', 'Carlos', 'Marco', 'Giovanni', 'Lukas', 'Sven', 'Timo', 'Antoine',
+  'Enzo', 'Thiago', 'Matteo', 'Santiago', 'Alejandro', 'Samuel', 'David', 'Hugo', 'Arthur', 'Louis',
+  'Mohamed', 'Amadou', 'Ibrahim', 'Keita', 'Daiki', 'Hiroto', 'Min-jun', 'Jin-woo', 'Mateusz', 'Kacper',
+  'Nikola', 'Luka', 'Dominik', 'Bence', 'Dusan', 'Milan', 'Emil', 'Rasmus', 'Mikael', 'Jesper',
+  'Goncalo', 'Diogo', 'Rui', 'Joao', 'Francisco', 'Alvaro', 'Iker', 'Unai', 'Pedri', 'Gavi'
+];
+
+const lastNames = [
+  'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 
+  'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 
+  'Silva', 'Santos', 'Oliveira', 'Rossi', 'Ferrari', 'Romano', 'Müller', 'Schmidt', 'Weber', 'Wagner', 
+  'Dubois', 'Moreau', 'Bernard', 'Van Dijk', 'De Jong', 'Tanaka', 'Suzuki', 'Kim', 'Park', 'Diallo', 
+  'Toure', 'Traore', 'Coulibaly', 'Cisse', 'Mensah', 'Okafor', 'Diallo', 'Kebe', 'Sarr', 'Diallo',
+  'Fernandes', 'Pereira', 'Costa', 'Ribeiro', 'Almeida', 'Carvalho', 'Gomes', 'Lints', 'Varga', 'Nagy',
+  'Kovacs', 'Toth', 'Horvath', 'Popov', 'Petrov', 'Ivanov', 'Kowalski', 'Wisniewski', 'Wojcik', 'Kamel'
+];
 
 const positions: Position[] = ['GK', 'DEF', 'MID', 'ATT'];
 
