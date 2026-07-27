@@ -1,13 +1,45 @@
-import { SaveState } from "./types";
-const DB_NAME="football-gm-simulator"; const STORE="saves";
-export async function saveGame(state:SaveState):Promise<void>{
-  const request=indexedDB.open(DB_NAME,1);
-  await new Promise<void>((resolve,reject)=>{
-    request.onupgradeneeded=()=>request.result.createObjectStore(STORE);
-    request.onsuccess=()=>{const db=request.result; const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).put(state,"current"); tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);};
-    request.onerror=()=>reject(request.error);
+import { WorldState } from './types';
+
+const DB_NAME = 'FootballGMSimulator';
+const STORE_NAME = 'worldState';
+const DB_VERSION = 1;
+
+export const initDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    
+    request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
   });
-}
-export async function loadGame():Promise<SaveState|null>{
-  return new Promise(resolve=>{const r=indexedDB.open(DB_NAME,1); r.onupgradeneeded=()=>r.result.createObjectStore(STORE); r.onsuccess=()=>{const g=r.result.transaction(STORE,"readonly").objectStore(STORE).get("current"); g.onsuccess=()=>resolve(g.result??null); g.onerror=()=>resolve(null)}; r.onerror=()=>resolve(null)});
-}
+};
+
+export const saveWorld = async (world: WorldState): Promise<void> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(world, 'currentSave');
+    
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const loadWorld = async (): Promise<WorldState | null> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get('currentSave');
+    
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+};
