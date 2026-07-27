@@ -3,12 +3,14 @@ import { WorldState, Club, MatchResult } from './types';
 import { getInitialWorldState } from './data';
 import { loadWorld, saveWorld } from './storage';
 import { simulateMatch } from './engine/SimulationEngine';
-import { advanceDay } from './engine/GlobalScheduler'; // <-- Imported the new clock!
+import { advanceDay } from './engine/GlobalScheduler';
+import { scoutYouthAcademy } from './engine/YouthAcademy';
 
 export default function App() {
   const [world, setWorld] = useState<WorldState | null>(null);
-  const [activeTab, setActiveTab] = useState<'squad' | 'match' | 'history'>('squad');
+  const [activeTab, setActiveTab] = useState<'squad' | 'match' | 'history' | 'academy'>('squad');
   const [lastMatch, setLastMatch] = useState<MatchResult | null>(null);
+  const [academyMessage, setAcademyMessage] = useState<string>('');
 
   useEffect(() => {
     async function init() {
@@ -28,16 +30,32 @@ export default function App() {
     return <div style={{ color: 'white', padding: '20px' }}>Loading Football GM Universe...</div>;
   }
 
-  const userClub: Club = world.clubs[0]; // Player controls first team
+  const userClub: Club = world.clubs[0];
   const opponentClub: Club = world.clubs[1];
 
   const handleSimulateMatch = async () => {
     const result = simulateMatch(userClub, opponentClub, 'Premier League', world.currentDate);
     setLastMatch(result);
 
+    const updatedClubs = world.clubs.map((c, idx) => idx === 0 ? userClub : c);
     const updatedWorld: WorldState = {
       ...world,
-      matchHistory: [result, ...world.matchHistory]
+      matchHistory: [result, ...world.matchHistory],
+      clubs: updatedClubs
+    };
+
+    setWorld(updatedWorld);
+    await saveWorld(updatedWorld);
+  };
+
+  const handleScoutYouth = async () => {
+    const { updatedClub, message } = scoutYouthAcademy(userClub, world.currentDate);
+    setAcademyMessage(message);
+
+    const updatedClubs = world.clubs.map((c, idx) => idx === 0 ? updatedClub : c);
+    const updatedWorld: WorldState = {
+      ...world,
+      clubs: updatedClubs
     };
 
     setWorld(updatedWorld);
@@ -50,7 +68,6 @@ export default function App() {
         <h1 style={{ margin: 0, color: '#38bdf8' }}>Football Management Simulator</h1>
         <p style={{ color: '#94a3b8', margin: '5px 0 0 0' }}>Managing: <strong>{userClub.name}</strong> | Date: {world.currentDate}</p>
         
-        {/* NEW ADVANCE DAY BUTTON */}
         <button 
           onClick={async () => {
             const newWorld = advanceDay(world);
@@ -73,6 +90,11 @@ export default function App() {
           onClick={() => setActiveTab('match')}
           style={{ padding: '10px 20px', backgroundColor: activeTab === 'match' ? '#0284c7' : '#1e293b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
           Match Day
+        </button>
+        <button 
+          onClick={() => setActiveTab('academy')}
+          style={{ padding: '10px 20px', backgroundColor: activeTab === 'academy' ? '#0284c7' : '#1e293b', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
+          Youth Academy
         </button>
         <button 
           onClick={() => setActiveTab('history')}
@@ -156,7 +178,28 @@ export default function App() {
         </div>
       )}
 
-      {/* TAB 3: HISTORY */}
+      {/* TAB 3: YOUTH ACADEMY */}
+      {activeTab === 'academy' && (
+        <div style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px' }}>
+          <h2>Youth Academy Scouting</h2>
+          <p style={{ color: '#94a3b8' }}>Send scouts out to discover youth prospects. Scouts can only return with a new prospect once every 30 days.</p>
+          <p><strong>Last Scouted Date:</strong> {userClub.lastYouthScoutDate || 'Never'}</p>
+
+          <button 
+            onClick={handleScoutYouth}
+            style={{ padding: '12px 25px', backgroundColor: '#0284c7', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '10px' }}>
+            Scout Youth Prospect 🔍
+          </button>
+
+          {academyMessage && (
+            <p style={{ marginTop: '15px', padding: '10px', backgroundColor: '#334155', borderRadius: '5px', color: '#38bdf8' }}>
+              {academyMessage}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: HISTORY */}
       {activeTab === 'history' && (
         <div>
           <h2>Match History</h2>
